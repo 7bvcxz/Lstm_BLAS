@@ -53,13 +53,14 @@ double Get_Error(float* ans, float* out, int w, int m, int n) {
 void LSTM_Cell(int k, float* w_hh, float* h, float* hh_, float* ih_, float* b, float* c, int w, int m, int n) {
 	int incx=1, incy=1, alpha=1, beta=0, lda=m;
 	
-	auto start0 = Time::now();
+	//auto start0 = Time::now();
 	cblas_sgemv(CblasRowMajor, CblasNoTrans, n, m, alpha, w_hh, lda, &h[k*n], incx, beta, hh_, incy);
-	auto end0 = Time::now();
-	fsec time0 = end0 - start0;
-	gemv_time = gemv_time + time0.count();
+
+	//auto end0 = Time::now();
+	//fsec time0 = end0 - start0;
+	//gemv_time = gemv_time + time0.count();
 	
-	auto start1 = Time::now();
+	//auto start1 = Time::now();
 	for (int i=0; i<n; i++)
 		hh_[i] = hh_[i] + ih_[i] + b[i];
 	
@@ -87,14 +88,14 @@ void LSTM_Cell(int k, float* w_hh, float* h, float* hh_, float* ih_, float* b, f
 		c_new[i] = (forget_gate[i] * c_old[i]) + in_gate[i] * cell_gate[i];
 		h_new[i] = out_gate[i] * TANH(c_new[i]);
 	}
-	auto end1 = Time::now();
-	fsec time1 = end1 - start1;
-	etc_time = etc_time + time1.count();
+	//auto end1 = Time::now();
+	//fsec time1 = end1 - start1;
+	//etc_time = etc_time + time1.count();
 }
 
 int main(int argc, char **argv) {
-	int w = 2;  // num_word
-	int m = 1024; // num_col
+	int w = 1;  // num_word
+	int m = 512; // num_col
 	int n = 4096; // num_row
 
 	/* Initialize */
@@ -132,26 +133,35 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < n; i++)
 		b[i] = float(RAND_MAX) / (rand()*100);
 
+	
+	/* Flush Cache */
 	  // Cache Flush W_HH
 	for (int i=0; i<n; i++) {
 		for (int j=0; j<m; j++) {
 			_mm_clflush(&w_hh[i * m + j]);
 		}
 	}
+	  // Cache Flush by simple Big data
+	float *flush0 = (float *)malloc(128 * 1024 * 1024);  // size : 16MB
+	float *flush1 = (float *)malloc(128 * 1024 * 1024);  // size : 16MB
+	int flush_m = 128 * 1024 * 1024 / sizeof(float);
+
+	for (int i=0; i<flush_m; i++)
+		flush1[i] = flush0[i] + flush1[i];
 
 	auto start = Time::now();
 
 	/* Calculate Custom LSTM Answer */
 	  // First GEMM (Input - Hidden)
 	int incx=1, incy=1, alpha=1, beta=0, lda=m, ldb=n, ldc=n;
-	//cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, w, n, m, alpha, in, lda, w_ih, ldb, beta, ih_, ldc);
+	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, w, n, m, alpha, in, lda, w_ih, ldb, beta, ih_, ldc);
 
 	auto end = Time::now();
 	fsec time = end - start;
 	gemm_time = time.count();
 
 	  // Second GEMV (Hidden - Hidden)
-	for (int k=0; k<(w-1); k++)
+	for (int k=0; k<w; k++)
 		LSTM_Cell(k, w_hh, h, hh_, ih_, b, c, w, m, n);
 
 	//for (int k=0; k<w; k++)
@@ -160,9 +170,9 @@ int main(int argc, char **argv) {
 
 
 	std::cout << "tot_time : " << gemm_time + gemv_time + etc_time << "s\n";
-	std::cout << "  gemm_time : " << gemm_time << "s\n";
-	std::cout << "  gemv_time : " << gemv_time << "s\n";
-	std::cout << "  etc_time  : " << etc_time << "s\n";
+	//std::cout << "  gemm_time : " << gemm_time << "s\n";
+	//std::cout << "  gemv_time : " << gemv_time << "s\n";
+	//std::cout << "  etc_time  : " << etc_time << "s\n";
 	
 	/* Calculate CPU Answer */
 	//Compute_CPU(ans, in, hh_, ih_, h, c, w_hh, w_ih, b, w, m, n);

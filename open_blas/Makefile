@@ -9,13 +9,19 @@ TARGET=lstm
 
 all: $(TARGET)
 
-clean:
-	rm -f *.o
-	rm -f lstm
-
 init:
 	export OPENBLAS_NUM_THREADS=4
 	export OMP_NUM_THREADS=4
+
+clean:
+	rm -f *.o
+	rm -f lstm
+	rm -f bn
+lstm:
+	$(CC) -o lstm lstm.cpp $(INCDIRS) $(LIBDIRS) $(LIBS)
+
+bn1d:
+	$(CC) -o bn1d bn1d.cpp $(INCDIRS) $(LIBDIRS) $(LIBS)
 
 $(TARGET): $(OBJS)
 	$(CC) -o $@ $(OBJS) $(INCDIRS) $(LIBDIRS) $(LIBS)
